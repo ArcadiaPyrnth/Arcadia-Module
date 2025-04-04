@@ -1,0 +1,196 @@
+local arcadia = {}
+
+--[[
+Arcadia's Module V1.0 - RELEASE!!
+New:
+	• Bezier operations (Curve Making & Tweening)
+	• Tween operations (For any property)
+	• Player operations (Kill, Teleport[To Position], Teleport[To Game])
+	• Player leaderstats(Stats) creating, loading and saving!! (DataStoreService)
+]]
+
+--Services
+local TweenService = game:GetService("TweenService")
+local TeleportService = game:GetService("TeleportService")
+
+--Tween uses an Object(BasePart), the Goal(Table) with the Object's property(ies), a TweenInfo(TweenInfo), and a wait(boolean) to yield the script until the tween completed
+function arcadia.Tween(Object : BasePart, Goal, TweenInfo : TweenInfo, Wait : boolean)
+	local tween = TweenService:Create(Object, TweenInfo, Goal)
+	
+	tween:Play()
+	
+	if Wait then
+		tween.Completed:Wait()
+	end
+	
+	task.delay(TweenInfo.Time, function()
+		tween:Destroy()
+	end)
+end
+
+--Quickly kill a player via their character model
+function arcadia.KillPlayer(Character : Model)
+	local Humanoid : Humanoid = Character:FindFirstChild("Humanoid")
+	
+	Humanoid.Health = 0
+end
+
+--Make an animation through the AnimationID(number)[CAN ONLY BE THE NUMBERS], an Animator to link the animation, and Wait(boolean) to choose if the script yields until the animation ends. Once it's played, it will be destroyed
+function arcadia.PlayCharacterAnimation(Animator : Animator, AnimationID : number, Wait : boolean)
+	local string = "rbxassetid://" .. AnimationID
+	local animation = Instance.new("Animation")
+	animation.AnimationId = string
+
+	local loaded = Animator:LoadAnimation(animation)
+
+	loaded:Play()
+
+	if Wait then
+		loaded.Ended:Wait()
+	end
+
+	task.delay(loaded.Length, function()
+		loaded:Destroy()
+		animation:Destroy()
+	end)
+end
+
+--Teleport a player's Character(Model) to a location via Positon(Vector3)
+function arcadia.TeleportPlayer(Character : Model, Position : Vector3)
+	Character:PivotTo(CFrame.new(Position))
+end
+
+--Quickly teleports a player(s)(Table), through the corresponding GameID(number)
+function arcadia.GameTeleport(GameID : number, players)
+	TeleportService:TeleportAsync(GameID, players)
+end
+
+--leaderstats(Players stats)
+
+--Creating leaderstats folder from Player, and can be a variable for other functions
+function arcadia.CreateStats(Player : Player)
+	local leaderstats = Instance.new("Folder", Player)
+	leaderstats.Name = "leaderstats"
+	return leaderstats
+end
+
+--Create a new value object that must match Instance.new(ValueType), and will automatically be parented to the leaderstats
+function arcadia.CreateStatValue(leaderstats : Folder, ValueType : string, ValueName : string)
+	local newValue = Instance.new(ValueType, leaderstats)
+	newValue.Name = ValueName
+	return newValue
+end
+
+--Save a player's(Player) data through ..., and save it to a DataStore by transfering it with PlayerData(Table)
+function arcadia.SaveStats(Player : Player, PlayerData, DataStore : DataStore, ...)	
+	rawset(PlayerData, Player.UserId, {})
+	
+	local values
+	
+	if type(...) == "table" then
+		values = ...
+	else
+		values = {...}
+	end
+	
+	for i, ValueObject in pairs(values) do
+		rawset(PlayerData[Player.UserId], ValueObject.Name, ValueObject.Value)
+	end
+	
+	local success, err = pcall(function()
+		return DataStore:SetAsync(Player.UserId, PlayerData[Player.UserId])
+	end)
+	
+	table.remove(PlayerData, Player.UserId)
+end
+
+--Load a player's(Player) data from a DataStore by transfer it with PlayerData(Table)
+function arcadia.LoadStats(Player : Player, PlayerData, DataStore : DataStore, ...)
+	local success, data = pcall(function()
+		return DataStore:GetAsync(Player.UserId, PlayerData[Player.UserId])
+	end)
+		
+	local values
+	
+	if type(...) == "table" then
+		values = ...
+	else
+		values = {...}
+	end
+	
+	if success then
+		
+		PlayerData[Player.UserId] = data
+		
+		if data then
+			for i, ValueObject in pairs(values) do
+				local linkedValue = PlayerData[Player.UserId][ValueObject.Name]
+
+				ValueObject.Value = linkedValue
+			end
+		else 
+			for i, ValueObject in pairs(values) do
+				if type(ValueObject) == "number" then
+					ValueObject.Value = 0
+				elseif type(ValueObject) == "string" then
+					ValueObject.Value = " "
+				end
+			end
+		end
+			else warn("Unsuccessful on " .. DataStore.Name)
+	end
+end
+
+--Easily and quickly finds, then assigns a humanoid through the .Touched Event from another part
+function arcadia.HumanoidTouch(otherPart : BasePart)
+	local Humanoid : Humanoid = otherPart.Parent:FindFirstChild("Humanoid")
+	if Humanoid then
+		return Humanoid
+	end
+end
+
+function lerp(a, b, t)
+	return a + (b-a) * t
+end
+
+--Make a Bezier (Curve) and assign an Object(BasePart) to tween the curve through multiple LerpPoints(number)
+function arcadia.BezierTween(Start : Vector3, Center: Vector3, End : Vector3, Object : BasePart, LerpPoints : number)
+	local tween : Tween
+	Object.CFrame = CFrame.new(Start)
+	
+	for i = 0, LerpPoints, 1 do
+		local t = i/LerpPoints
+		
+		local point1 = lerp(Start, Center, t)
+		local point2 = lerp(Center, End, t)
+		
+		local bezier = lerp(point1, point2, t)
+		
+		tween = TweenService:Create(Object, TweenInfo.new(0.1), {CFrame = CFrame.new(bezier)})
+		tween:Play()
+		tween.Completed:Wait()
+		
+		if i == LerpPoints then
+			tween:Destroy()
+		end
+	end
+end
+
+--Make a Bezier (Curve) and make a full path displaying the curve to display with a cloned Object(BasePart), LerpPoints(number) are the amount of points that are cloned from the Object(BasePart) through the path
+function arcadia.BezierCreate(Start : Vector3, Center: Vector3, End : Vector3, Object : BasePart, LerpPoints : number)
+	for i = 0, LerpPoints, 1 do
+		local t = i/LerpPoints
+		
+		local newPoint = Object:Clone()
+		newPoint.Parent = workspace
+		
+		local point1 = lerp(Start, Center, t)
+		local point2 = lerp(Center, End, t)
+
+		local bezier = lerp(point1, point2, t)
+		
+		newPoint.CFrame = CFrame.new(bezier)
+	end
+end
+
+return arcadia
