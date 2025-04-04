@@ -1,7 +1,8 @@
 The AM(Arcadia Module) is a module for Roblox Studio.
 The goal for AM is to make any developer at any level make coding simpler.
 
-CURRENT FUNCTIONS (As of 1.0)
+CURRENT FUNCTIONS (As of 1.0):
+
 • Bezier Operations (Path Creating & Tweening)
 
 • Tweening
